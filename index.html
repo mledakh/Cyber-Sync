@@ -167,37 +167,106 @@ function isOpenPalm(landmarks) {
   return extendedCount === 4;
 }
 
+
 function drawShield(x, y, progress) {
-  const radius = 65 + progress * 35;
+  const time = performance.now() / 1000;
+  const pulse = Math.sin(time * 5) * 8;
+  const radius = 78 + pulse + progress * 20;
 
   ctx.save();
 
-  ctx.globalAlpha = 1 - progress;
-  ctx.lineWidth = 4;
-  ctx.strokeStyle = "#00f0ff";
+  // Main energy glow
   ctx.shadowColor = "#00f0ff";
   ctx.shadowBlur = 30;
+  ctx.strokeStyle = "#00f0ff";
+  ctx.lineWidth = 3;
+
+  // Outer rotating ring
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.rotate(time * 1.5);
 
   ctx.beginPath();
-  ctx.arc(x, y, radius, 0, Math.PI * 2);
+  ctx.arc(0, 0, radius, 0.3, Math.PI * 1.7);
   ctx.stroke();
 
+  ctx.lineWidth = 1.5;
+  ctx.setLineDash([8, 12]);
+
+  ctx.beginPath();
+  ctx.arc(0, 0, radius + 12, 0, Math.PI * 2);
+  ctx.stroke();
+
+  ctx.setLineDash([]);
+
+  // Hexagonal shield geometry
+  ctx.beginPath();
+
+  for (let i = 0; i < 6; i++) {
+    const angle = (Math.PI / 3) * i - Math.PI / 2;
+    const hx = Math.cos(angle) * radius * 0.65;
+    const hy = Math.sin(angle) * radius * 0.65;
+
+    if (i === 0) {
+      ctx.moveTo(hx, hy);
+    } else {
+      ctx.lineTo(hx, hy);
+    }
+  }
+
+  ctx.closePath();
+  ctx.stroke();
+
+  // Inner holographic ring
   ctx.lineWidth = 2;
+  ctx.strokeStyle = "#8dfcff";
 
   ctx.beginPath();
-  ctx.arc(x, y, radius * 0.75, 0, Math.PI * 2);
+  ctx.arc(0, 0, radius * 0.45, time * 2, time * 2 + Math.PI * 1.5);
   ctx.stroke();
 
-  // Cybernetic crosshair
+  ctx.restore();
+
+  // Energy sparks
+  ctx.fillStyle = "#ffffff";
+  ctx.shadowBlur = 20;
+
+  for (let i = 0; i < 12; i++) {
+    const angle = time * 2 + i * (Math.PI * 2 / 12);
+
+    const sparkRadius =
+      radius + Math.sin(time * 7 + i) * 15;
+
+    const sx = x + Math.cos(angle) * sparkRadius;
+    const sy = y + Math.sin(angle) * sparkRadius;
+
+    ctx.beginPath();
+    ctx.arc(sx, sy, 2 + Math.sin(time * 10 + i), 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  // Targeting crosshair
+  ctx.strokeStyle = "#00f0ff";
+  ctx.lineWidth = 1.5;
+
   ctx.beginPath();
-  ctx.moveTo(x - radius - 20, y);
-  ctx.lineTo(x + radius + 20, y);
-  ctx.moveTo(x, y - radius - 20);
-  ctx.lineTo(x, y + radius + 20);
+  ctx.moveTo(x - radius - 25, y);
+  ctx.lineTo(x - radius - 8, y);
+
+  ctx.moveTo(x + radius + 8, y);
+  ctx.lineTo(x + radius + 25, y);
+
+  ctx.moveTo(x, y - radius - 25);
+  ctx.lineTo(x, y - radius - 8);
+
+  ctx.moveTo(x, y + radius + 8);
+  ctx.lineTo(x, y + radius + 25);
+
   ctx.stroke();
 
   ctx.restore();
 }
+
 
 function detectLoop() {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
