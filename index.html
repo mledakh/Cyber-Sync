@@ -1,0 +1,253 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<title>NEURO//SYNC</title>
+
+<style>
+  * {
+    box-sizing: border-box;
+  }
+
+  body {
+    margin: 0;
+    background: #050814;
+    color: #00f0ff;
+    font-family: monospace;
+    text-align: center;
+  }
+
+  h2 {
+    letter-spacing: 4px;
+    margin: 20px 0 8px;
+  }
+
+  #status {
+    color: #a0b4d0;
+    margin: 10px;
+  }
+
+  #cameraBox {
+    position: relative;
+    width: 100%;
+    max-width: 500px;
+    margin: auto;
+    overflow: hidden;
+    border: 1px solid #00f0ff;
+  }
+
+  video, canvas {
+    display: block;
+    width: 100%;
+    height: auto;
+  }
+
+  video {
+    transform: scaleX(-1);
+  }
+
+  canvas {
+    position: absolute;
+    top: 0;
+    left: 0;
+    transform: scaleX(-1);
+  }
+
+  button {
+    margin: 20px;
+    padding: 14px 24px;
+    background: #00f0ff;
+    color: #050814;
+    border: none;
+    font-family: monospace;
+    font-weight: bold;
+    letter-spacing: 2px;
+  }
+</style>
+</head>
+
+<body>
+
+<h2>NEURO//SYNC</h2>
+<p id="status">SYSTEM STANDBY</p>
+
+<div id="cameraBox">
+  <video id="video" autoplay playsinline></video>
+  <canvas id="canvas"></canvas>
+</div>
+
+<button id="startButton">INITIALIZE</button>
+
+<script type="module">
+import {
+  FilesetResolver,
+  HandLandmarker
+} from "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@latest/vision_bundle.mjs";
+
+const video = document.getElementById("video");
+const canvas = document.getElementById("canvas");
+const ctx = canvas.getContext("2d");
+const statusLabel = document.getElementById("status");
+const startButton = document.getElementById("startButton");
+
+let handLandmarker;
+let lastVideoTime = -1;
+let previousOpenPalm = false;
+let shieldStart = 0;
+
+async function initialize() {
+  try {
+    statusLabel.textContent = "LOADING AI CORE...";
+
+    const vision = await FilesetResolver.forVisionTasks(
+      "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@latest/wasm"
+    );
+
+    handLandmarker = await HandLandmarker.createFromOptions(
+      vision,
+      {
+        baseOptions: {
+          modelAssetPath: "./hand_landmarker.task",
+          delegate: "CPU"
+        },
+        runningMode: "VIDEO",
+        numHands: 1
+      }
+    );
+
+    statusLabel.textContent = "CAMERA INITIALIZATION...";
+
+    const stream = await navigator.mediaDevices.getUserMedia({
+      video: {
+        facingMode: "user",
+        width: 640,
+        height: 480
+      },
+      audio: false
+    });
+
+    video.srcObject = stream;
+    await video.play();
+
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+
+    statusLabel.textContent = "SYSTEM ONLINE // SHOW YOUR HAND";
+
+    startButton.style.display = "none";
+
+    requestAnimationFrame(detectLoop);
+
+  } catch (error) {
+    statusLabel.textContent = "ERROR: " + error.message;
+    console.error(error);
+  }
+}
+
+function isOpenPalm(landmarks) {
+  // Finger tips must be above their PIP joints.
+  const fingers = [
+    [8, 6],   // Index
+    [12, 10], // Middle
+    [16, 14], // Ring
+    [20, 18]  // Pinky
+  ];
+
+  let extendedCount = 0;
+
+  for (const [tip, pip] of fingers) {
+    if (landmarks[tip].y < landmarks[pip].y) {
+      extendedCount++;
+    }
+  }
+
+  return extendedCount === 4;
+}
+
+function drawShield(x, y, progress) {
+  const radius = 65 + progress * 35;
+
+  ctx.save();
+
+  ctx.globalAlpha = 1 - progress;
+  ctx.lineWidth = 4;
+  ctx.strokeStyle = "#00f0ff";
+  ctx.shadowColor = "#00f0ff";
+  ctx.shadowBlur = 30;
+
+  ctx.beginPath();
+  ctx.arc(x, y, radius, 0, Math.PI * 2);
+  ctx.stroke();
+
+  ctx.lineWidth = 2;
+
+  ctx.beginPath();
+  ctx.arc(x, y, radius * 0.75, 0, Math.PI * 2);
+  ctx.stroke();
+
+  // Cybernetic crosshair
+  ctx.beginPath();
+  ctx.moveTo(x - radius - 20, y);
+  ctx.lineTo(x + radius + 20, y);
+  ctx.moveTo(x, y - radius - 20);
+  ctx.lineTo(x, y + radius + 20);
+  ctx.stroke();
+
+  ctx.restore();
+}
+
+function detectLoop() {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+  if (video.readyState >= 2 && video.currentTime !== lastVideoTime) {
+    lastVideoTime = video.currentTime;
+
+    const result = handLandmarker.detectForVideo(
+      video,
+      performance.now()
+    );
+
+    if (result.landmarks.length > 0) {
+      const hand = result.landmarks[0];
+
+      const palmOpen = isOpenPalm(hand);
+
+      if (palmOpen && !previousOpenPalm) {
+        shieldStart = performance.now();
+        statusLabel.textContent = "CYBERWARE ACTIVE // SHIELD";
+      }
+
+      previousOpenPalm = palmOpen;
+
+      if (palmOpen) {
+        const center = hand[9];
+
+        const x = center.x * canvas.width;
+        const y = center.y * canvas.height;
+
+        const elapsed = performance.now() - shieldStart;
+        const progress = (elapsed % 1000) / 1000;
+
+        drawShield(x, y, progress);
+
+      } else {
+        statusLabel.textContent = "SYSTEM ONLINE // WAITING";
+      }
+
+    } else {
+      previousOpenPalm = false;
+      statusLabel.textContent = "NO HAND DETECTED";
+    }
+  }
+
+  requestAnimationFrame(detectLoop);
+}
+
+startButton.addEventListener("click", initialize);
+</script>
+
+</body>
+</html>
