@@ -167,6 +167,52 @@ function isOpenPalm(landmarks) {
   return extendedCount === 4;
 }
 
+function drawActivationBurst(x, y, progress) {
+  const radius = 25 + progress * 150;
+  const alpha = 1 - progress;
+
+  ctx.save();
+
+  ctx.globalAlpha = alpha;
+  ctx.strokeStyle = "#00f0ff";
+  ctx.lineWidth = 4;
+  ctx.shadowColor = "#00f0ff";
+  ctx.shadowBlur = 35;
+
+  // Expanding energy ring
+  ctx.beginPath();
+  ctx.arc(x, y, radius, 0, Math.PI * 2);
+  ctx.stroke();
+
+  // Secondary ring
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.arc(x, y, radius * 0.7, 0, Math.PI * 2);
+  ctx.stroke();
+
+  // Energy rays
+  for (let i = 0; i < 12; i++) {
+    const angle = (Math.PI * 2 / 12) * i;
+
+    const innerRadius = radius * 0.8;
+    const outerRadius = radius + 30;
+
+    ctx.beginPath();
+    ctx.moveTo(
+      x + Math.cos(angle) * innerRadius,
+      y + Math.sin(angle) * innerRadius
+    );
+
+    ctx.lineTo(
+      x + Math.cos(angle) * outerRadius,
+      y + Math.sin(angle) * outerRadius
+    );
+
+    ctx.stroke();
+  }
+
+  ctx.restore();
+}
 
 function drawShield(x, y, progress) {
   const time = performance.now() / 1000;
@@ -291,16 +337,22 @@ function detectLoop() {
 
       previousOpenPalm = palmOpen;
 
-      if (palmOpen) {
-        const center = hand[9];
+      
+if (palmOpen) {
+  const center = hand[9];
 
-        const x = center.x * canvas.width;
-        const y = center.y * canvas.height;
+  const x = center.x * canvas.width;
+  const y = center.y * canvas.height;
 
-        const elapsed = performance.now() - shieldStart;
-        const progress = (elapsed % 1000) / 1000;
+  const elapsed = performance.now() - shieldStart;
+  const progress = (elapsed % 1000) / 1000;
 
-        drawShield(x, y, progress);
+  // Activation burst lasts 600 milliseconds
+  if (elapsed < 600) {
+    drawActivationBurst(x, y, elapsed / 600);
+  }
+
+  drawShield(x, y, progress);
 
       } else {
         statusLabel.textContent = "SYSTEM ONLINE // WAITING";
