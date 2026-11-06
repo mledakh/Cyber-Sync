@@ -167,8 +167,8 @@ function isOpenPalm(landmarks) {
   return extendedCount === 4;
 }
 
-function drawActivationBurst(x, y, progress) {
-  const radius = 25 + progress * 150;
+function drawActivationBurst(x, y, progress, handScale) {
+  const radius = (20 + ease * 210) * handScale;
   const alpha = 1 - progress;
 
   ctx.save();
@@ -214,10 +214,10 @@ function drawActivationBurst(x, y, progress) {
   ctx.restore();
 }
 
-function drawShield(x, y, progress) {
+function drawShield(x, y, progress, handScale) {
   const time = performance.now() / 1000;
   const pulse = Math.sin(time * 5) * 8;
-  const radius = 78 + pulse + progress * 20;
+  const radius = (78 + pulse + progress * 20) * handScale;
 
   ctx.save();
 
@@ -327,6 +327,20 @@ function detectLoop() {
 
     if (result.landmarks.length > 0) {
       const hand = result.landmarks[0];
+       // Estimate hand size
+       const wrist = hand[0];
+       const middleBase = hand[9];
+
+       const handSize = Math.hypot(
+         middleBase.x - wrist.x,
+         middleBase.y - wrist.y
+       );
+
+       // Dynamic shield scale
+       const handScale = Math.max(
+         0.65,
+         Math.min(1.6, handSize / 0.14)
+       );
 
       const palmOpen = isOpenPalm(hand);
 
@@ -349,10 +363,10 @@ if (palmOpen) {
 
   // Activation burst lasts 600 milliseconds
   if (elapsed < 600) {
-    drawActivationBurst(x, y, elapsed / 600);
+    drawActivationBurst(x, y, elapsed / 600, handScale);
   }
 
-  drawShield(x, y, progress);
+  drawShield(x, y, progress, handScale);
 
       } else {
         statusLabel.textContent = "SYSTEM ONLINE // WAITING";
